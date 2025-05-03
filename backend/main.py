@@ -74,7 +74,7 @@ def get_voices():
 
 # API to distribute boards
 
-gemini_api_key = "AIzaSyBm_iR_y9lPRkwyCKpy_LbFqP4rvjLFAdg"
+gemini_api_key = "API_KEY"
 
 gemini_client = genai.Client(api_key=gemini_api_key)
 

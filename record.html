@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <body>
+    <button id="recordBtn">開始錄音</button>
+    <button id="stopBtn" disabled>停止錄音</button>
+    <button id="uploadBtn" disabled>上傳</button>
+    <audio id="audioPlayer" controls></audio>
+    <pre id="result"></pre>
+    <script>
+      let mediaRecorder,
+        audioChunks = [],
+        audioBlob;
+
+      document.getElementById("recordBtn").onclick = async () => {
+        audioChunks = [];
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.start();
+        document.getElementById("recordBtn").disabled = true;
+        document.getElementById("stopBtn").disabled = false;
+        document.getElementById("result").textContent = "錄音中...";
+        mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+          audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+          document.getElementById("audioPlayer").src =
+            URL.createObjectURL(audioBlob);
+          document.getElementById("uploadBtn").disabled = false;
+          document.getElementById("result").textContent = "錄音完成，可以上傳";
+        };
+      };
+
+      document.getElementById("stopBtn").onclick = () => {
+        mediaRecorder.stop();
+        document.getElementById("recordBtn").disabled = false;
+        document.getElementById("stopBtn").disabled = true;
+      };
+
+      document.getElementById("uploadBtn").onclick = async () => {
+        document.getElementById("result").textContent = "上傳中...";
+        try {
+          const resp = await fetch("http://192.168.18.96:1145/ChatWithGPT", {
+            method: "POST",
+            headers: { "Content-Type": "audio/wav" },
+            body: audioBlob,
+          });
+          const data = await resp.json();
+          document.getElementById("result").textContent = data.text;
+        } catch (e) {
+          document.getElementById("result").textContent = "錯誤：" + e;
+        }
+      };
+    </script>
+  </body>
+</html>

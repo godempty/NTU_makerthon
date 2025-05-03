@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ChatWithGPT 測試</title>
+  </head>
+  <body>
+    <h2>ChatWithGPT 語音測試</h2>
+    <input type="file" id="wavfile" accept=".wav" />
+    <button onclick="send()">送出</button>
+    <pre id="result"></pre>
+    <script>
+      async function send() {
+        const fileInput = document.getElementById("wavfile");
+        const result = document.getElementById("result");
+        if (!fileInput.files.length) {
+          result.textContent = "請選擇 wav 檔案";
+          return;
+        }
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append("file", file, "upload.wav");
+        result.textContent = "上傳中...";
+        try {
+          const resp = await fetch("http://192.168.18.96:1145/ChatWithGPT", {
+            method: "POST",
+            body: formData,
+          });
+          const text = await resp.text();
+          result.textContent = text;
+        } catch (e) {
+          result.textContent = "錯誤：" + e;
+        }
+      }
+    </script>
+  </body>
+</html>

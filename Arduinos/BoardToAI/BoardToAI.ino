@@ -94,32 +94,52 @@ void sendWavFile() {
     return;
   }
 
-  String rawFileContent = "";
-  while (file.available()) {
-    rawFileContent += char(file.read());
+  long fileSize = file.size();
+  long bytesUploaded = 0;
+  const int chunkSize = 4410; // 可依需求調整
+
+  String jsonLeft = "{";
+  jsonLeft += "\"board_id\":\"esp32_1\",";
+  jsonLeft += "\"name\":\"ESP32\",";
+  jsonLeft += "\"file\":\"";
+  String jsonRight = "\"}";
+
+  long base64Len = ((fileSize + 2) / 3) * 4;
+  long contentLen = jsonLeft.length() + base64Len + jsonRight.length();
+
+  WiFiClient client;
+
+  if (!client.connect(server, port)) {
+    Serial.println("Connection failed!");
+    file.close();
+    return;
+  }  
+
+  client.println("POST " + url + " HTTP/1.1");
+  client.println("Host: " + String(server));
+  client.println("Content-Type: application/json");
+  client.print("Content-Length: ");
+  client.println(contentLen);
+  client.println("Connection: close");
+  client.println();
+  client.print(jsonLeft);
+
+  uint8_t buffer[chunkSize];
+  while (bytesUploaded < fileSize) {
+    size_t bytesToRead = min((long)chunkSize, fileSize - bytesUploaded);
+    size_t bytesRead = file.read(buffer, bytesToRead);
+    if (bytesRead == 0) {
+      Serial.println("Failed to read chunk from file!");
+      break;
+    }
+    String encodedData = base64::encode((char*)buffer, bytesRead);
+    client.print(encodedData);
+    bytesUploaded += bytesRead;
   }
   file.close();
-
-  String encodedData = base64::encode(rawFileContent);
-
-  String json = "{";
-  json += "\"board_id\":\"esp32_1\",";
-  json += "\"name\":\"ESP32\",";
-  json += "\"file\":\"" + encodedData + "\"";
-  json += "}";
-
-  HTTPClient http;
-  http.begin(uploadAPI);
-  http.addHeader("Content-Type", "application/json");
-
-  int httpResponseCode = http.POST(json);
-  String response = http.getString();
-  Serial.print("HTTP Response code: ");
-  Serial.println(httpResponseCode);
-  Serial.println("Response: ");
-  Serial.println(response);
-
-  http.end();
+  client.print(jsonRight);
+  Serial.println(readResponse());
+  client.stop();
 }
 
 String readResponse() {
@@ -320,7 +340,7 @@ void loop() {
 
   if (!recording) {
     startRecording();
-  } else if (dataSize >= 20000) {  //end recording every 1000 bytes
+  } else if (dataSize >= 441000) {  //end recording every 1000 bytes
     stopRecording();
     delay(1000);
     sendWavFile();

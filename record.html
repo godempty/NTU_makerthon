@@ -45,8 +45,15 @@
             headers: { "Content-Type": "audio/wav" },
             body: audioBlob,
           });
-          const data = await resp.json();
-          document.getElementById("result").textContent = data.text;
+          const blob = await resp.blob();
+          const downloadUrl = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = downloadUrl;
+          a.download = "result.wav"; // 或後端實際給的檔名
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(downloadUrl);
         } catch (e) {
           document.getElementById("result").textContent = "錯誤：" + e;
         }

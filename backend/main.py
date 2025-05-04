@@ -5,14 +5,12 @@ from pydub import AudioSegment
 from google import genai
 from google.genai import types
 from base64 import b64decode
+from google.cloud import texttospeech as tts
+from dotenv import load_dotenv
+load_dotenv()
+
 app = Flask(__name__)
 CORS(app)
-
-import torch
-from parler_tts import ParlerTTSForConditionalGeneration
-from transformers import AutoTokenizer
-import soundfile as sf
-
 
 class Board:
   def __init__(self, board_id, name, ip):
@@ -74,17 +72,9 @@ def get_voices():
 
 # API to distribute boards
 
-gemini_api_key = "API_KEY"
+gemini_client = genai.Client()
 
-gemini_client = genai.Client(api_key=gemini_api_key)
-
-# TTS_key = "c6016c5c-3970-46aa-b9f0-8284ba7ad3e8"
-# TTS_url = "https://client.camb.ai/apis/tts"
-# headers = {
-#     "Accept": "application/json",
-#     "x-api-key": API_KEY,
-#     "Content-Type": "application/json"
-# }
+tts_client = tts.TextToSpeechClient()
 
 @app.route('/ChatWithGPT', methods=['POST'])
 def fetch_api():
@@ -96,7 +86,7 @@ def fetch_api():
   stt_response = gemini_client.models.generate_content(
     model="gemini-2.0-flash",
     contents=[
-      "你是一個語音助手，與駕駛者進行語音對話。使用自然、簡潔的語氣回應問題或聊天話題。你不需要回應過於長的說明，並避免過多細節。駕駛者可能會問你問題、閒聊或抱怨交通狀況。保持語氣友善、輕鬆，並根據駕駛者語音內容回覆。",
+      "你是一個語音助手，與駕駛者進行語音對話。使用自然、簡潔的語氣回應問題或聊天話題。你不需要回應過於長的說明，並避免過多細節。駕駛者可能會問你問題、閒聊或抱怨交通狀況。語氣以及內容根據駕駛者語音回覆，目標是讓駕駛者保持良好的駕駛狀態。",
       types.Part.from_bytes(
         data = file,
         mime_type="audio/wav",
@@ -104,10 +94,30 @@ def fetch_api():
     ]
   )
   print(stt_response.text)
-  return jsonify({"text": stt_response.text}), 200
-  # device = "cuda:0" if torch.cuda.is_available() else "cpu"
-  # model = ParlerTTSForConditionalGeneration.from_pretrained("parler-tts/parler-tts-mini-v1").to(device)
-  # tokenizer = AutoTokenizer.from_pretrained("parler-tts/parler-tts-mini-v1")
+  input_text = tts.SynthesisInput(text=stt_response.text)
+  voice = tts.VoiceSelectionParams(
+    language_code="cmn-CN",
+    name="cmn-CN-Chirp3-HD-Sulafat",
+  )
+  audio_config = tts.AudioConfig(
+    audio_encoding=tts.AudioEncoding.LINEAR16,
+    sample_rate_hertz=8000,
+  )
+  tts_response = tts_client.synthesize_speech(
+    request={"input": input_text, "voice": voice, "audio_config": audio_config}
+  )
+  file = tts_response.audio_content
+  with open("response.wav", "wb") as out:
+    out.write(file)
+
+  buffer = BytesIO(file)
+  buffer.seek(0)
+  return send_file(
+      buffer,
+      mimetype="audio/wav",
+      as_attachment=True,
+      download_name="response.wav"
+  )
     
 
 if __name__ == '__main__':
